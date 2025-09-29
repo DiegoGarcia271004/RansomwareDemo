@@ -282,6 +282,8 @@ class RansomwareDemoVerificacionReal:
             print("\n2️⃣  CIFRANDO ARCHIVOS...")
             self.cifrar_archivos_con_verificacion()
             
+            input("\n⏸️  Presiona Enter para demostración de ilegibilidad...")
+
             # Fase 3: Demostración de ilegibilidad
             print("\n3️⃣  DEMOSTRANDO ILEGIBILIDAD...")
             self.demostrar_ilegibilidad()
