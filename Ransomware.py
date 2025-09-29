@@ -1,82 +1,130 @@
 #!/usr/bin/env python3
 """
-DEMOSTRACIÓN CON VERIFICACIÓN DE ENCRIPTACIÓN EN TIEMPO REAL
+DEMOSTRACIÓN CON VERIFICACIÓN MEJORADA DE CIFRADO
 """
 
 import os
 import time
 import hashlib
+import string
 from cryptography.fernet import Fernet
 
-class RansomwareDemoConVerificacion:
+class RansomwareDemoVerificacionReal:
     def __init__(self):
         self.target_folder = "/tmp/ransomware_demo/"
         self.key = Fernet.generate_key()
         self.cipher = Fernet(self.key)
         self.hashes_originales = {}
-        self.hashes_cifrados = {}
         
     def calcular_hash(self, datos):
         """Calcula hash SHA-256 para verificación"""
-        return hashlib.sha256(datos).hexdigest()[:16]  # Primeros 16 chars
+        return hashlib.sha256(datos).hexdigest()[:16]
+
+    def es_texto_legible(self, datos):
+        """Verifica si los datos son texto legible"""
+        try:
+            texto = datos.decode('utf-8', errors='ignore')
+            # Contar caracteres imprimibles
+            caracteres_imprimibles = sum(1 for c in texto if c in string.printable)
+            porcentaje_legible = (caracteres_imprimibles / len(texto)) * 100
+            return porcentaje_legible > 80.0  # Si más del 80% es legible
+        except:
+            return False
+
+    def analizar_entropia(self, datos):
+        """Analiza la entropía para detectar datos cifrados"""
+        if len(datos) == 0:
+            return 0
+        
+        # Calcular frecuencia de bytes
+        freq = {}
+        for byte in datos:
+            freq[byte] = freq.get(byte, 0) + 1
+        
+        # Calcular entropía
+        entropia = 0
+        for count in freq.values():
+            p = count / len(datos)
+            entropia -= p * (p and (p).log2())  # Evitar log(0)
+        
+        return entropia
 
     def crear_archivos_prueba(self):
-        """Crea archivos de prueba y guarda sus hashes"""
+        """Crea archivos de prueba variados"""
         os.makedirs(self.target_folder, exist_ok=True)
         
         archivos_prueba = {
-            "documento.txt": "Este es un documento de prueba para la demostración.",
-            "foto.jpg.demo": "Contenido simulado de imagen " + "x" * 100,
-            "datos.xlsx.demo": "Datos de prueba para Excel " + "y" * 50
+            "documento.txt": "Este es un documento de prueba importante para la demostración.",
+            "contraseñas.txt": "usuario: admin\ncontraseña: Demo123!\nemail: test@demo.com",
+            "datos_sensibles.csv": "nombre,edad,saldo\nJuan,30,5000\nMaria,25,3000",
+            "imagen.jpg.demo": b"JFIF" + b"\xff" * 100,  # Simular header de JPEG
+            "base_datos.db.demo": b"SQLite" + b"\x00" * 50  # Simular archivo binario
         }
         
         for nombre, contenido in archivos_prueba.items():
             ruta = os.path.join(self.target_folder, nombre)
-            with open(ruta, 'w') as f:
-                f.write(contenido)
             
-            # Calcular y guardar hash original
-            with open(ruta, 'rb') as f:
-                self.hashes_originales[nombre] = self.calcular_hash(f.read())
+            if isinstance(contenido, str):
+                with open(ruta, 'w', encoding='utf-8') as f:
+                    f.write(contenido)
+                # Guardar también en bytes para hash consistente
+                contenido_bytes = contenido.encode('utf-8')
+            else:
+                with open(ruta, 'wb') as f:
+                    f.write(contenido)
+                contenido_bytes = contenido
             
+            self.hashes_originales[nombre] = self.calcular_hash(contenido_bytes)
             print(f"✓ Creado: {nombre} | Hash: {self.hashes_originales[nombre]}")
-    
-    def verificar_estado_archivos(self, fase):
-        """Verifica y muestra el estado actual de los archivos"""
-        print(f"\n🔍 VERIFICACIÓN - {fase}:")
-        print("-" * 50)
+
+    def verificar_archivo_detallado(self, ruta_archivo, nombre_archivo):
+        """Verificación detallada de un archivo individual"""
+        with open(ruta_archivo, 'rb') as f:
+            contenido = f.read()
         
-        for archivo in os.listdir(self.target_folder):
-            ruta = os.path.join(self.target_folder, archivo)
-            if os.path.isfile(ruta):
-                with open(ruta, 'rb') as f:
-                    contenido = f.read()
-                    hash_actual = self.calcular_hash(contenido)
-                    tamaño = len(contenido)
-                    
-                    # Verificar si es cifrado o original
-                    estado = "CIFRADO" if archivo.endswith('.cifrado') else "ORIGINAL"
-                    
-                    print(f"📁 {archivo}")
-                    print(f"   Estado: {estado}")
-                    print(f"   Tamaño: {tamaño} bytes")
-                    print(f"   Hash: {hash_actual}")
-                    
-                    # Comparar con hash original si existe
-                    nombre_base = archivo.replace('.cifrado', '')
-                    if nombre_base in self.hashes_originales:
-                        if hash_actual == self.hashes_originales[nombre_base]:
-                            print(f"   ✅ COINCIDENCIA con original")
-                        else:
-                            print(f"   ❌ DIFERENTE al original")
-                    print()
+        hash_actual = self.calcular_hash(contenido)
+        tamaño = len(contenido)
+        es_legible = self.es_texto_legible(contenido)
+        entropia = self.analizar_entropia(contenido)
+        
+        print(f"📁 {nombre_archivo}")
+        print(f"   Tamaño: {tamaño} bytes")
+        print(f"   Hash: {hash_actual}")
+        print(f"   ¿Texto legible?: {'✅ SÍ' if es_legible else '❌ NO'}")
+        print(f"   Entropía: {entropia:.2f} bits")
+        
+        # Mostrar preview del contenido
+        if es_legible:
+            try:
+                preview = contenido.decode('utf-8', errors='ignore')[:60]
+                print(f"   Preview: '{preview}...'")
+            except:
+                print(f"   Preview: [No se puede decodificar]")
+        else:
+            print(f"   Preview (hex): {contenido[:30].hex()}...")
+        
+        # Comparar con original si existe
+        nombre_base = nombre_archivo.replace('.cifrado', '')
+        if nombre_base in self.hashes_originales:
+            if hash_actual == self.hashes_originales[nombre_base]:
+                print(f"   🔄 Estado: IDÉNTICO al original")
+            else:
+                print(f"   🔄 Estado: MODIFICADO (cifrado)")
+        
+        print()
 
     def cifrar_archivos_con_verificacion(self):
-        """Cifra archivos mostrando verificación paso a paso"""
-        print("🔒 INICIANDO CIFRADO CON VERIFICACIÓN...")
+        """Cifrado con verificación mejorada"""
+        print("🔒 INICIANDO CIFRADO CON VERIFICACIÓN MEJORADA...")
         
-        # Verificación ANTES del cifrado
-        self.verificar_estado_archivos("ANTES DEL CIFRADO")
+        print("\n📊 ESTADO INICIAL DE ARCHIVOS:")
+        print("=" * 50)
+        for archivo in os.listdir(self.target_folder):
+            if os.path.isfile(os.path.join(self.target_folder, archivo)):
+                self.verificar_archivo_detallado(
+                    os.path.join(self.target_folder, archivo), 
+                    archivo
+                )
         
         input("\n⏸️  Presiona Enter para proceder con el cifrado...")
         
@@ -86,158 +134,147 @@ class RansomwareDemoConVerificacion:
             if os.path.isfile(ruta_completa) and not archivo.endswith('.cifrado'):
                 print(f"\n🔄 Cifrando: {archivo}")
                 
-                # Leer y mostrar datos originales
                 with open(ruta_completa, 'rb') as f:
                     datos_originales = f.read()
                 
-                print(f"   Contenido original (primeros 50 bytes): {datos_originales[:50]}")
-                print(f"   Hash original: {self.calcular_hash(datos_originales)}")
+                # Mostrar análisis antes
+                print(f"   ANTES - Legible: {self.es_texto_legible(datos_originales)}")
+                print(f"   ANTES - Entropía: {self.analizar_entropia(datos_originales):.2f}")
                 
                 # Cifrar
                 datos_cifrados = self.cipher.encrypt(datos_originales)
-                self.hashes_cifrados[archivo] = self.calcular_hash(datos_cifrados)
                 
-                print(f"   Contenido cifrado (primeros 50 bytes): {datos_cifrados[:50]}")
-                print(f"   Hash cifrado: {self.hashes_cifrados[archivo]}")
+                # Mostrar análisis después
+                print(f"   DESPUÉS - Legible: {self.es_texto_legible(datos_cifrados)}")
+                print(f"   DESPUÉS - Entropía: {self.analizar_entropia(datos_cifrados):.2f}")
                 
-                # Guardar archivo cifrado
+                # Guardar cifrado
                 nuevo_nombre = archivo + ".cifrado"
                 with open(os.path.join(self.target_folder, nuevo_nombre), 'wb') as f:
                     f.write(datos_cifrados)
                 
-                # Eliminar original
                 os.remove(ruta_completa)
                 print(f"   ✅ {archivo} → {nuevo_nombre}")
         
-        # Verificación DESPUÉS del cifrado
-        print("\n" + "="*60)
-        self.verificar_estado_archivos("DESPUÉS DEL CIFRADO")
+        print("\n📊 ESTADO FINAL DE ARCHIVOS (CIFRADOS):")
+        print("=" * 50)
+        for archivo in os.listdir(self.target_folder):
+            if os.path.isfile(os.path.join(self.target_folder, archivo)):
+                self.verificar_archivo_detallado(
+                    os.path.join(self.target_folder, archivo), 
+                    archivo
+                )
 
-    def demostrar_lectura_cifrada(self):
-        """Demuestra que los archivos cifrados son ilegibles"""
-        print("\n📖 DEMOSTRACIÓN DE LECTURA DE ARCHIVOS CIFRADOS:")
-        print("-" * 50)
+    def demostrar_ilegibilidad(self):
+        """Demostración práctica de que no se pueden usar los archivos"""
+        print("\n🚫 DEMOSTRACIÓN PRÁCTICA DE ILEGIBILIDAD:")
+        print("=" * 50)
         
         for archivo in os.listdir(self.target_folder):
             if archivo.endswith('.cifrado'):
                 ruta = os.path.join(self.target_folder, archivo)
+                nombre_base = archivo.replace('.cifrado', '')
                 
-                print(f"\n📁 Intentando leer: {archivo}")
+                print(f"\n🎯 Intentando usar: {archivo} como {nombre_base}")
                 
-                try:
-                    with open(ruta, 'rb') as f:
-                        contenido_cifrado = f.read()
-                    
-                    # Intentar leer como texto (debería fallar)
+                with open(ruta, 'rb') as f:
+                    contenido_cifrado = f.read()
+                
+                # Intentar usar según el tipo de archivo original
+                if nombre_base.endswith('.txt') or nombre_base.endswith('.csv'):
+                    print("   📝 Intentando leer como texto...")
                     try:
-                        texto_intento = contenido_cifrado.decode('utf-8')
-                        print(f"   ❌ ERROR: Se pudo decodificar como texto (no debería pasar)")
+                        texto = contenido_cifrado.decode('utf-8')
+                        print(f"   ❌ INESPERADO: Se pudo leer como texto")
+                        print(f"   Contenido: {texto[:100]}...")
                     except UnicodeDecodeError:
-                        print(f"   ✅ Correcto: No se puede decodificar como texto")
-                    
-                    # Mostrar contenido cifrado
-                    print(f"   Contenido cifrado (hex): {contenido_cifrado[:30].hex()}...")
-                    print(f"   Tamaño cifrado: {len(contenido_cifrado)} bytes")
-                    
-                except Exception as e:
-                    print(f"   ❌ Error leyendo archivo: {e}")
+                        print("   ✅ CORRECTO: No se puede decodificar como texto")
+                
+                elif nombre_base.endswith('.jpg.demo'):
+                    print("   🖼️  Intentando detectar como imagen...")
+                    # Verificar header de JPEG
+                    if contenido_cifrado.startswith(b'\xff\xd8\xff'):
+                        print("   ✅ Parece ser una imagen JPEG válida")
+                    else:
+                        print("   ❌ No es una imagen JPEG válida")
+                
+                elif nombre_base.endswith('.db.demo'):
+                    print("   💾 Intentando detectar como base de datos...")
+                    if contenido_cifrado.startswith(b'SQLite'):
+                        print("   ✅ Parece ser una base de datos SQLite")
+                    else:
+                        print("   ❌ No es una base de datos SQLite válida")
+                
+                # Mostrar diferencia práctica
+                print(f"   🔍 Conclusión: El archivo {nombre_base} es INUTILIZABLE")
 
-    def descifrar_archivos_con_verificacion(self):
-        """Descifra mostrando verificación de integridad"""
-        print("\n🔓 INICIANDO DESCIFRADO CON VERIFICACIÓN...")
-        
-        # Verificación antes del descifrado
-        self.verificar_estado_archivos("ANTES DEL DESCIFRADO")
-        
-        input("\n⏸️  Presiona Enter para proceder con el descifrado...")
+    def descifrar_y_verificar(self):
+        """Descifrado con verificación de utilidad"""
+        print("\n🔓 DESCIFRADO Y VERIFICACIÓN DE UTILIDAD:")
+        print("=" * 50)
         
         for archivo in os.listdir(self.target_folder):
             if archivo.endswith(".cifrado"):
                 ruta_completa = os.path.join(self.target_folder, archivo)
+                nombre_original = archivo.replace(".cifrado", "")
                 
                 print(f"\n🔄 Descifrando: {archivo}")
                 
                 with open(ruta_completa, 'rb') as f:
                     datos_cifrados = f.read()
                 
-                print(f"   Hash antes de descifrar: {self.calcular_hash(datos_cifrados)}")
-                
                 try:
-                    # Descifrar
                     datos_originales = self.cipher.decrypt(datos_cifrados)
-                    nombre_original = archivo.replace(".cifrado", "")
-                    
-                    print(f"   Hash después de descifrar: {self.calcular_hash(datos_originales)}")
-                    print(f"   Hash original guardado: {self.hashes_originales.get(nombre_original, 'No encontrado')}")
                     
                     # Verificar integridad
                     hash_actual = self.calcular_hash(datos_originales)
-                    hash_original = self.hashes_originales.get(nombre_original)
-                    
-                    if hash_actual == hash_original:
-                        print(f"   ✅ INTEGRIDAD VERIFICADA: Los datos son idénticos al original")
-                    else:
-                        print(f"   ❌ ERROR DE INTEGRIDAD: Los datos no coinciden")
+                    hash_esperado = self.hashes_originales.get(nombre_original)
                     
                     # Guardar archivo recuperado
-                    with open(os.path.join(self.target_folder, nombre_original), 'wb') as f:
-                        f.write(datos_originales)
+                    if nombre_original.endswith('.demo'):  # Archivos binarios
+                        with open(os.path.join(self.target_folder, nombre_original), 'wb') as f:
+                            f.write(datos_originales)
+                    else:  # Archivos de texto
+                        with open(os.path.join(self.target_folder, nombre_original), 'w', encoding='utf-8') as f:
+                            f.write(datos_originales.decode('utf-8'))
                     
                     os.remove(ruta_completa)
-                    print(f"   ✅ Recuperado exitosamente: {nombre_original}")
+                    
+                    # Verificar utilidad
+                    print(f"   ✅ Descifrado exitoso")
+                    print(f"   🔍 Integridad: {'✅ VERIFICADA' if hash_actual == hash_esperado else '❌ CORRUPTO'}")
+                    print(f"   📊 Utilidad: {'✅ RECUPERADO' if self.es_texto_legible(datos_originales) else '⚠️  Verificar'}")
                     
                 except Exception as e:
-                    print(f"   ❌ Error descifrando {archivo}: {e}")
-        
-        # Verificación final
-        print("\n" + "="*60)
-        self.verificar_estado_archivos("DESPUÉS DEL DESCIFRADO")
+                    print(f"   ❌ Error: {e}")
 
     def ejecutar_demo_completa(self):
-        """Ejecuta la demostración completa con verificación"""
-        print("🚨 DEMOSTRACIÓN CON VERIFICACIÓN EN TIEMPO REAL 🚨")
+        """Ejecuta la demostración completa"""
+        print("🚨 DEMOSTRACIÓN MEJORADA - VERIFICACIÓN REAL DE CIFRADO")
         print("=" * 60)
         
         # Fase 1: Preparación
-        print("\n1️⃣  CREANDO ARCHIVOS DE PRUEBA...")
+        print("\n1️⃣  PREPARANDO ARCHIVOS DE PRUEBA...")
         self.crear_archivos_prueba()
         
-        input("\n⏸️  Presiona Enter para iniciar fase de cifrado...")
+        input("\n⏸️  Presiona Enter para cifrado...")
         
-        # Fase 2: Cifrado con verificación
-        print("\n2️⃣  FASE DE CIFRADO (SIMULACIÓN DE ATAQUE)")
+        # Fase 2: Cifrado
+        print("\n2️⃣  CIFRANDO ARCHIVOS...")
         self.cifrar_archivos_con_verificacion()
         
         # Fase 3: Demostración de ilegibilidad
-        print("\n3️⃣  DEMOSTRANDO QUE LOS ARCHIVOS SON ILEGIBLES")
-        self.demostrar_lectura_cifrada()
+        print("\n3️⃣  DEMOSTRANDO ILEGIBILIDAD...")
+        self.demostrar_ilegibilidad()
         
-        input("\n⏸️  Presiona Enter para mostrar mensaje de rescate...")
+        input("\n⏸️  Presiona Enter para recuperación...")
         
-        # Fase 4: Mensaje de rescate
-        print("\n4️⃣  MENSAJE DE RESCATE SIMULADO")
-        mensaje_rescate = f"""
-        ⚠️  ¡TUS ARCHIVOS HAN SIDO CIFRADOS! ⚠️
+        # Fase 4: Recuperación
+        print("\n4️⃣  RECUPERANDO ARCHIVOS...")
+        self.descifrar_y_verificar()
         
-        Para verificar el cifrado:
-        - Los archivos tienen extensión .cifrado
-        - No se pueden abrir con programas normales
-        - El contenido es ilegible
-        - Los hashes SHA-256 han cambiado completamente
-        
-        Clave de demostración: {self.key.decode()}
-        """
-        print(mensaje_rescate)
-        
-        input("\n⏸️  Presiona Enter para proceder con la recuperación...")
-        
-        # Fase 5: Recuperación con verificación
-        print("\n5️⃣  FASE DE RECUPERACIÓN CON CLAVE CORRECTA")
-        self.descifrar_archivos_con_verificacion()
-        
-        print("\n✅ DEMOSTRACIÓN COMPLETADA EXITOSAMENTE")
+        print("\n✅ DEMOSTRACIÓN COMPLETADA - CIFRADO VERIFICADO")
 
-# Ejecutar demostración
 if __name__ == "__main__":
-    demo = RansomwareDemoConVerificacion()
+    demo = RansomwareDemoVerificacionReal()
     demo.ejecutar_demo_completa()
