@@ -28,7 +28,6 @@ class RansomwareDemoVerificacionReal:
             if len(texto) == 0:
                 return False
                 
-            # Contar caracteres imprimibles
             caracteres_imprimibles = sum(1 for c in texto if c in string.printable)
             porcentaje_legible = (caracteres_imprimibles / len(texto)) * 100
             return porcentaje_legible > 80.0
@@ -40,16 +39,14 @@ class RansomwareDemoVerificacionReal:
         if len(datos) == 0:
             return 0
         
-        # Calcular frecuencia de bytes
         freq = {}
         for byte in datos:
             freq[byte] = freq.get(byte, 0) + 1
         
-        # Calcular entropía - VERSIÓN CORREGIDA
         entropia = 0
         for count in freq.values():
             p = count / len(datos)
-            if p > 0:  # Evitar log(0)
+            if p > 0: 
                 entropia -= p * math.log2(p)
         
         return entropia
@@ -62,8 +59,8 @@ class RansomwareDemoVerificacionReal:
             "documento.txt": "Este es un documento de prueba importante para la demostración.",
             "contraseñas.txt": "usuario: admin\ncontraseña: Demo123!\nemail: test@demo.com",
             "datos_sensibles.csv": "nombre,edad,saldo\nJuan,30,5000\nMaria,25,3000",
-            "imagen.jpg.demo": b"JFIF" + b"\xff" * 100,  # Simular header de JPEG
-            "base_datos.db.demo": b"SQLite" + b"\x00" * 50  # Simular archivo binario
+            "imagen.jpg.demo": b"JFIF" + b"\xff" * 100,  
+            "base_datos.db.demo": b"SQLite" + b"\x00" * 50 
         }
         
         for nombre, contenido in archivos_prueba.items():
@@ -72,7 +69,6 @@ class RansomwareDemoVerificacionReal:
             if isinstance(contenido, str):
                 with open(ruta, 'w', encoding='utf-8') as f:
                     f.write(contenido)
-                # Guardar también en bytes para hash consistente
                 with open(ruta, 'rb') as f:
                     contenido_bytes = f.read()
             else:
@@ -97,10 +93,9 @@ class RansomwareDemoVerificacionReal:
             print(f"📁 {nombre_archivo}")
             print(f"   Tamaño: {tamaño} bytes")
             print(f"   Hash: {hash_actual}")
-            print(f"   ¿Texto legible?: {'✅ SÍ' if es_legible else '❌ NO'}")
+            print(f"   ¿Texto legible?: {' SÍ' if es_legible else '❌ NO'}")
             print(f"   Entropía: {entropia:.2f} bits")
             
-            # Mostrar preview del contenido
             if es_legible:
                 try:
                     preview = contenido.decode('utf-8', errors='ignore')[:60]
@@ -110,13 +105,12 @@ class RansomwareDemoVerificacionReal:
             else:
                 print(f"   Preview (hex): {contenido[:30].hex()}...")
             
-            # Comparar con original si existe
             nombre_base = nombre_archivo.replace('.cifrado', '')
             if nombre_base in self.hashes_originales:
                 if hash_actual == self.hashes_originales[nombre_base]:
-                    print(f"   🔄 Estado: IDÉNTICO al original")
+                    print(f"   Estado: IDÉNTICO al original")
                 else:
-                    print(f"   🔄 Estado: MODIFICADO (cifrado)")
+                    print(f"   Estado: MODIFICADO (cifrado)")
             
             print()
             
@@ -125,22 +119,22 @@ class RansomwareDemoVerificacionReal:
 
     def cifrar_archivos_con_verificacion(self):
         """Cifrado con verificación mejorada"""
-        print("🔒 INICIANDO CIFRADO CON VERIFICACIÓN MEJORADA...")
+        print(" INICIANDO CIFRADO CON VERIFICACIÓN MEJORADA...")
         
-        print("\n📊 ESTADO INICIAL DE ARCHIVOS:")
+        print("\n ESTADO INICIAL DE ARCHIVOS:")
         print("=" * 50)
         for archivo in os.listdir(self.target_folder):
             ruta_completa = os.path.join(self.target_folder, archivo)
             if os.path.isfile(ruta_completa):
                 self.verificar_archivo_detallado(ruta_completa, archivo)
         
-        input("\n⏸️  Presiona Enter para proceder con el cifrado...")
+        input("\n⏸  Presiona Enter para proceder con el cifrado...")
         
         for archivo in os.listdir(self.target_folder):
             ruta_completa = os.path.join(self.target_folder, archivo)
             
             if os.path.isfile(ruta_completa) and not archivo.endswith('.cifrado'):
-                print(f"\n🔄 Cifrando: {archivo}")
+                print(f"\n Cifrando: {archivo}")
                 
                 try:
                     with open(ruta_completa, 'rb') as f:
@@ -167,12 +161,12 @@ class RansomwareDemoVerificacionReal:
                         f.write(datos_cifrados)
                     
                     os.remove(ruta_completa)
-                    print(f"   ✅ {archivo} → {nuevo_nombre}")
+                    print(f"   {archivo} → {nuevo_nombre}")
                     
                 except Exception as e:
                     print(f"   ❌ Error cifrando {archivo}: {e}")
         
-        print("\n📊 ESTADO FINAL DE ARCHIVOS (CIFRADOS):")
+        print("\n ESTADO FINAL DE ARCHIVOS (CIFRADOS):")
         print("=" * 50)
         for archivo in os.listdir(self.target_folder):
             ruta_completa = os.path.join(self.target_folder, archivo)
@@ -181,7 +175,7 @@ class RansomwareDemoVerificacionReal:
 
     def demostrar_ilegibilidad(self):
         """Demostración práctica de que no se pueden usar los archivos"""
-        print("\n🚫 DEMOSTRACIÓN PRÁCTICA DE ILEGIBILIDAD:")
+        print("\n DEMOSTRACIÓN PRÁCTICA DE ILEGIBILIDAD:")
         print("=" * 50)
         
         for archivo in os.listdir(self.target_folder):
@@ -189,7 +183,7 @@ class RansomwareDemoVerificacionReal:
                 ruta = os.path.join(self.target_folder, archivo)
                 nombre_base = archivo.replace('.cifrado', '')
                 
-                print(f"\n🎯 Intentando usar: {archivo} como {nombre_base}")
+                print(f"\n Intentando usar: {archivo} como {nombre_base}")
                 
                 try:
                     with open(ruta, 'rb') as f:
@@ -197,31 +191,31 @@ class RansomwareDemoVerificacionReal:
                     
                     # Intentar usar según el tipo de archivo original
                     if nombre_base.endswith('.txt') or nombre_base.endswith('.csv'):
-                        print("   📝 Intentando leer como texto...")
+                        print("   Intentando leer como texto...")
                         try:
                             texto = contenido_cifrado.decode('utf-8')
                             print(f"   ❌ INESPERADO: Se pudo leer como texto")
                             print(f"   Contenido: {texto[:100]}...")
                         except UnicodeDecodeError:
-                            print("   ✅ CORRECTO: No se puede decodificar como texto")
+                            print("   CORRECTO: No se puede decodificar como texto")
                     
                     elif nombre_base.endswith('.jpg.demo'):
-                        print("   🖼️  Intentando detectar como imagen...")
+                        print("    Intentando detectar como imagen...")
                         # Verificar header de JPEG
                         if contenido_cifrado.startswith(b'\xff\xd8\xff'):
-                            print("   ✅ Parece ser una imagen JPEG válida")
+                            print("   Parece ser una imagen JPEG válida")
                         else:
                             print("   ❌ No es una imagen JPEG válida")
                     
                     elif nombre_base.endswith('.db.demo'):
-                        print("   💾 Intentando detectar como base de datos...")
+                        print("   Intentando detectar como base de datos...")
                         if contenido_cifrado.startswith(b'SQLite'):
-                            print("   ✅ Parece ser una base de datos SQLite")
+                            print("   Parece ser una base de datos SQLite")
                         else:
                             print("   ❌ No es una base de datos SQLite válida")
                     
                     # Mostrar diferencia práctica
-                    print(f"   🔍 Conclusión: El archivo {nombre_base} es INUTILIZABLE")
+                    print(f"   Conclusión: El archivo {nombre_base} es INUTILIZABLE")
                     
                 except Exception as e:
                     print(f"   ❌ Error procesando {archivo}: {e}")
@@ -293,6 +287,7 @@ class RansomwareDemoVerificacionReal:
             # Fase 4: Recuperación
             print("\n4️⃣  RECUPERANDO ARCHIVOS...")
             self.descifrar_y_verificar()
+
             
             print("\n✅ DEMOSTRACIÓN COMPLETADA - CIFRADO VERIFICADO")
             
